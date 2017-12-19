@@ -34,12 +34,17 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
     train = data.load_data('train.json', args.word_base)
-    train, valid = data.split_exp(train, args.valid_ratio)
     test = data.load_data('test.json', args.word_base)
-    print('Train: %d | Valid: %d | Test: %d'%(len(train), len(valid), len(test)))
     vocabulary, pad_lens = data.build_vocab(train, test, args.vocab_size)
     print('Vocab size: %d | Max context: %d | Max question: %d'%(
           len(vocabulary), pad_lens[0], pad_lens[1]))
+    train, valid = data.split_exp(train, args.valid_ratio)
+    print('Train: %d | Valid: %d | Test: %d'%(len(train), len(valid), len(test)))
+    valid_engine = DataLoader(data.DataEngine(valid, vocabulary, pad_lens),
+                              batch_size=args.batch_size,
+                              shuffle=True,
+                              num_workers=8,
+                              pin_memory=use_cuda)
     test_engine = data.DataEngine(test, vocabulary, pad_lens)
     
     fusion_net = torch.load('model.cpt')
@@ -48,6 +53,22 @@ if __name__ == '__main__':
         fusion_net = fusion_net.cuda()
     fusion_net.eval()
     
+    valid_f1, valid_exact = 0, 0
+    for context, q, ans_offset in valid_engine:
+        context = Variable(context).cuda() if use_cuda else Variable(context)
+        q = Variable(q).cuda() if use_cuda else Variable(q)
+        start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
+        end_ans = Variable(ans_offset[:, 1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
+        start, end, start_attn, end_attn = fusion_net(context, q)
+
+        start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1, 20)
+        f1_score, exact_match_score = batch_score(start, end, ans_offset)
+        valid_f1 += f1_score
+        valid_exact += exact_match_score
+    print('valid_f1: %f | valid_exact: %f'%(
+          valid_f1/len(valid_engine), valid_exact/len(valid_engine)
+        ))
+
     f = open('predict.csv', 'w')
     f.write('id,answer\n')
     for i in tqdm(range(len(test_engine))):
