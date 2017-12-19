@@ -253,6 +253,8 @@ class FusionNet(nn.Module):
                                       hidden_size*2,
                                       )
 
+        # Dropout layer
+        self.dropout = nn.Dropout(p=0.4)
         
     def forward(self, context, question):
         '''
@@ -266,6 +268,9 @@ class FusionNet(nn.Module):
         # Embed word
         c_word = self.embedding(context)
         q_word = self.embedding(question)
+        
+        c_word = self.dropout(c_word)
+        q_word = self.dropout(q_word)
         # word_attn: (batch, c_len, word_dim)
         word_attn = self.word_attention(c_word, q_word)
         ''' 
@@ -283,11 +288,20 @@ class FusionNet(nn.Module):
         # q_low: (batch, q_len, hidden_size * 2)
         c_low, _ = self.c_low_reader(c_feature, self.c_low_reader.init_hidden(batch))
         q_low, _ = self.q_low_reader(q_feature, self.q_low_reader.init_hidden(batch))
+        
+        c_low = self.dropout(c_low)
+        q_low = self.dropout(q_low)
+
         c_high, _ = self.c_high_reader(c_low, self.c_high_reader.init_hidden(batch))
         q_high, _ = self.q_high_reader(q_low, self.q_high_reader.init_hidden(batch))
+
+        c_high = self.dropout(c_high)
+        q_high = self.dropout(q_high)
         # Question Understanding
         qu, _ = self.qu_reader(torch.cat((q_low, q_high), 2),
                             self.qu_reader.init_hidden(batch))
+        
+        qu = self.dropout(qu)
         # Form history of word
         # TODO: contextualized vector
         c_history = torch.cat((c_word, c_low, c_high), 2)
@@ -299,12 +313,17 @@ class FusionNet(nn.Module):
         # Read fully-fused informaiotn
         fused_v, _ = self.fused_reader(torch.cat((c_low, c_high, low_fusion, high_fusion, understand_fusion), 2),
                                     self.fused_reader.init_hidden(batch))
+        
+        fused_v = self.dropout(fused_v)
         # self-boosted fusion
         c_history = torch.cat((c_history, low_fusion, high_fusion,
                                 understand_fusion, fused_v), 2)
+        
         self_fusion = self.self_fusion(c_history, c_history, fused_v)
         cu, _ = self.cu_reader(torch.cat((fused_v, self_fusion), 2),
                             self.cu_reader.init_hidden(batch))
+        
+        cu = self.dropout(cu)
         # --- Pointer Network --- #
         start, end, start_attn, end_attn = self.pointer_net(cu, qu)
         return start, end, start_attn, end_attn
