@@ -275,10 +275,10 @@ class FusionNet(nn.Module):
         word_attn = self.word_attention(c_word, q_word)
         ''' 
         TODO:
-        both:
+        c_feature, q_feature:
             contextualized vector
-            POS, NER, Normalized term frequency
         c_feature: 
+            POS, NER, Normalized term frequency
             vector to indicate whether context occurs in quesiotn
         '''
         c_feature = torch.cat((c_word, word_attn), 2)

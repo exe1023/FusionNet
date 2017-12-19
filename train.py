@@ -23,7 +23,7 @@ parser.add_argument('--lr', type=float, default=1e-3, help='the learning rate of
 parser.add_argument('--valid_ratio', type=float, default=0.05)
 parser.add_argument('--valid_iters', type=int, default=1, help='run validation batch every N epochs ')
 parser.add_argument('--max_sent', type=int, default=25, help='max length of encoder, decoder')
-parser.add_argument('--display_iters', type=int, default=10, help='display training status every N iters [25]')
+parser.add_argument('--display_freq', type=int, default=10, help='display training status every N iters [25]')
 parser.add_argument('--save_freq', type=int, default=1, help='save model every N epochs')
 parser.add_argument('--epoch', type=int, default=25, help='train for N epochs [20]')
 parser.add_argument('--init_embedding', action='store_true', help='whether init embedding')
@@ -77,10 +77,11 @@ if __name__ == '__main__':
 
             start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
             f1_score, exact_match_score = batch_score(start, end, ans_offset)
-            print('epoch: %d | batch: %d/%d| loss: %f | f1: %f | exact: %f'%(
-                  epoch, batch, len(train_engine), loss.data[0], 
-                  f1_score, exact_match_score
-            ))
+            if batch % args.display_freq == 0:
+                print('epoch: %d | batch: %d/%d| loss: %f | f1: %f | exact: %f'%(
+                    epoch, batch, len(train_engine), loss.data[0], 
+                    f1_score, exact_match_score
+                ))
             batch +=1
         
         valid_f1, valid_exact = 0, 0

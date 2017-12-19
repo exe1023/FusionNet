@@ -79,6 +79,7 @@ class DataEngine(Dataset):
         self.datas = datas
         self.vocabulary = vocabulary
         self.pad_context, self.pad_q = pad_lens
+        self.test = test
         
     def __len__(self):
         return len(self.datas)

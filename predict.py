@@ -39,7 +39,7 @@ if __name__ == '__main__':
     vocabulary, pad_lens = data.build_vocab(train, test, args.vocab_size)
     print('Vocab size: %d | Max context: %d | Max question: %d'%(
           len(vocabulary), pad_lens[0], pad_lens[1]))
-    test_engine = data.DataEngine(test, vocabulary, pad_lens)
+    test_engine = data.DataEngine(test, vocabulary, pad_lens, test=True)
     
     fusion_net = torch.load('model.cpt')
 
@@ -55,7 +55,8 @@ if __name__ == '__main__':
         q = Variable(q).cuda() if use_cuda else Variable(q)
         start, end, start_attn, end_attn = fusion_net(context.unsqueeze(0), q.unsqueeze(0))
 
-        max_len = len(test_engine.datas[i]['context'])
+        #max_len = len(test_engine.datas[i]['context'])
+        max_len = 20
         start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1, max_len)
         qa_id = test_engine.datas[i]['id']
         output = qa_id + ','
