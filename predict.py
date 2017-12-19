@@ -2,6 +2,7 @@ import argparse
 import data
 from module import FusionNet, decode
 from metrics import batch_score
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch.nn as nn
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     vocabulary, pad_lens = data.build_vocab(train, test, args.vocab_size)
     print('Vocab size: %d | Max context: %d | Max question: %d'%(
           len(vocabulary), pad_lens[0], pad_lens[1]))
-    test_engine = data.DataEngine(test, vocabulary, pad_lens, test=True)
+    test_engine = data.DataEngine(test, vocabulary, pad_lens)
     
     fusion_net = torch.load('model.cpt')
 
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     
     f = open('predict.csv', 'w')
     f.write('id,answer\n')
-    for i in range(len(test_engine)):
+    for i in tqdm(range(len(test_engine))):
         context, q, ans_offset = test_engine[i]
         context = Variable(context).cuda() if use_cuda else Variable(context)
         q = Variable(q).cuda() if use_cuda else Variable(q)

@@ -12,6 +12,7 @@ I think it is easy to modify `preprocess.py` to use this model on SQuAD dataset.
 
 ## TODO:
 I will implement following word feature soon
+- Glove word vector and fine-tune (Maybe fasttext?)
 - CoVe vector
 - POS, NER, normalized term frequency
 - context word appears in the quesiton?
