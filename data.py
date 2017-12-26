@@ -22,6 +22,14 @@ def load_data(file_name, word_base):
             q = list(examples[idx]['q'])
         examples[idx]['context'] = context
         examples[idx]['q'] = q
+        
+        appear = []
+        for w in context:
+            if w in q:
+                appear.append(1)
+            else:
+                appear.append(0)
+        examples[idx]['appear'] = appear
     return examples
 
 def split_exp(examples, ratio):
@@ -79,7 +87,6 @@ class DataEngine(Dataset):
         self.datas = datas
         self.vocabulary = vocabulary
         self.pad_context, self.pad_q = pad_lens
-        self.test = test
         
     def __len__(self):
         return len(self.datas)
@@ -88,20 +95,24 @@ class DataEngine(Dataset):
         return self.vectorize(self.datas[idx]['context'],
                               self.datas[idx]['q'],
                               self.datas[idx]['ans_start'],
-                              self.datas[idx]['ans_end'])
+                              self.datas[idx]['ans_end'],
+                              self.datas[idx]['appear'])
 
-    def vectorize(self, context, q, ans_start, ans_end):
+    def vectorize(self, context, q, ans_start, ans_end, appear):
         padding_context = ['<PAD>' for _ in range(self.pad_context - len(context))]
         context = context + padding_context
 
         padding_q = ['<PAD>' for _ in range(self.pad_q - len(q))]
         q = q + padding_q
 
+        padding_appear = [0 for _ in range(self.pad_context - len(appear))]
+        appear = appear + padding_appear
+
         context = torch.LongTensor(self.vocabulary.word2idx(context))
         q = torch.LongTensor(self.vocabulary.word2idx(q))
         ans_offset = torch.LongTensor([ans_start, ans_end])
-        
-        return context, q, ans_offset
+        appear = torch.FloatTensor(appear)
+        return context, q, ans_offset, appear
 
 
 

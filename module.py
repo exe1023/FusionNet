@@ -187,15 +187,18 @@ class FusionNet(nn.Module):
     def __init__(self,
                  vocab_size,
                  word_dim=300,
-                 hidden_size=125
+                 hidden_size=125,
+                 pretrained_embedding=None
                  ):
         super(FusionNet, self).__init__()
         self.embedding = Embedding(vocab_size, word_dim)
+        if pretrained_embedding is not None:
+            self.embedding.init_embedding(pretrained_embedding)
         
         # --- FusionNet RNN reader --- #
         # low(high)-level concepts
         q_dim = word_dim
-        c_dim = word_dim + word_dim
+        c_dim = word_dim + word_dim + 1
         self.q_low_reader = DocReader(input_size=q_dim, 
                                   hidden_size=hidden_size,
                                   num_layers=1,
@@ -256,11 +259,12 @@ class FusionNet(nn.Module):
         # Dropout layer
         self.dropout = nn.Dropout(p=0.4)
         
-    def forward(self, context, question):
+    def forward(self, context, question, appear):
         '''
         Args:
             context:  (batch, c_len)
             question: (batch, q_len)
+            appear: (batch, c_len)
         '''
         batch = context.size(0)
         c_len = context.size(1)
@@ -279,9 +283,8 @@ class FusionNet(nn.Module):
             contextualized vector
         c_feature: 
             POS, NER, Normalized term frequency
-            vector to indicate whether context occurs in quesiotn
         '''
-        c_feature = torch.cat((c_word, word_attn), 2)
+        c_feature = torch.cat((c_word, appear.view(batch, c_len, 1), word_attn), 2)
         q_feature = q_word
         # Get low(high)-level concepts
         # c_low: (batch, c_len, hidden_size * 2)

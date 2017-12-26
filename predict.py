@@ -54,12 +54,13 @@ if __name__ == '__main__':
     fusion_net.eval()
     
     valid_f1, valid_exact = 0, 0
-    for context, q, ans_offset in valid_engine:
+    for context, q, ans_offset, appear in valid_engine:
         context = Variable(context).cuda() if use_cuda else Variable(context)
         q = Variable(q).cuda() if use_cuda else Variable(q)
         start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
         end_ans = Variable(ans_offset[:, 1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
-        start, end, start_attn, end_attn = fusion_net(context, q)
+        appear = Variable(appear).cuda() if use_cuda else Variable(appear)
+        start, end, start_attn, end_attn = fusion_net(context, q, appear)
 
         start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1, 20)
         f1_score, exact_match_score = batch_score(start, end, ans_offset)
@@ -75,7 +76,8 @@ if __name__ == '__main__':
         context, q, ans_offset = test_engine[i]
         context = Variable(context).cuda() if use_cuda else Variable(context)
         q = Variable(q).cuda() if use_cuda else Variable(q)
-        start, end, start_attn, end_attn = fusion_net(context.unsqueeze(0), q.unsqueeze(0))
+        appear = Variable(appear).cuda() if use_cuda else Variable(appear)
+        start, end, start_attn, end_attn = fusion_net(context.unsqueeze(0), q.unsqueeze(0), appear.unsqueeze(0))
 
         #max_len = len(test_engine.datas[i]['context'])
         max_len = 20

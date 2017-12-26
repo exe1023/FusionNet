@@ -3,8 +3,11 @@ import spacy
 import os
 from tqdm import tqdm
 import jieba
+import tokenizers
 dict_path = os.path.join(os.getenv("JIEBA_DATA"), "dict.txt.big") 
 
+annotators = {'ner','pos'}
+nlp = tokenizers.get_class('corenlp')(annotators=annotators)
 
 def tokenize(text):
     text = jieba.cut(text.strip(), cut_all=False)
