@@ -58,7 +58,8 @@ if __name__ == '__main__':
                        300)
     fusion_net = FusionNet(vocab_size=len(vocabulary),
                            word_dim=300,
-                           hidden_size=125)
+                           hidden_size=125,
+                           pretrained_embedding=w2v)
     if use_cuda:
         fusion_net = fusion_net.cuda()
     
