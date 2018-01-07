@@ -73,7 +73,7 @@ if __name__ == '__main__':
     f = open('predict.csv', 'w')
     f.write('id,answer\n')
     for i in tqdm(range(len(test_engine))):
-        context, q, ans_offset = test_engine[i]
+        context, q, ans_offset, appear = test_engine[i]
         context = Variable(context).cuda() if use_cuda else Variable(context)
         q = Variable(q).cuda() if use_cuda else Variable(q)
         appear = Variable(appear).cuda() if use_cuda else Variable(appear)

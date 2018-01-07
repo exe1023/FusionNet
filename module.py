@@ -188,6 +188,8 @@ class FusionNet(nn.Module):
                  vocab_size,
                  word_dim=300,
                  hidden_size=125,
+                 rnn_layer=1,
+                 dropout=0.4,
                  pretrained_embedding=None
                  ):
         super(FusionNet, self).__init__()
@@ -201,42 +203,42 @@ class FusionNet(nn.Module):
         c_dim = word_dim + word_dim + 1
         self.q_low_reader = DocReader(input_size=q_dim, 
                                   hidden_size=hidden_size,
-                                  num_layers=1,
+                                  num_layers=rnn_layer,
                                   bidirectional=True,
                                   rnn_type='lstm')
         self.q_high_reader = DocReader(input_size=hidden_size * 2,
                                        hidden_size=hidden_size,
-                                       num_layers=1,
+                                       num_layers=rnn_layer,
                                        bidirectional=True,
                                        rnn_type='lstm')
         self.c_low_reader = DocReader(input_size=c_dim,
                                   hidden_size=hidden_size,
-                                  num_layers=1,
+                                  num_layers=rnn_layer,
                                   bidirectional=True,
                                   rnn_type='lstm')
         self.c_high_reader = DocReader(input_size=hidden_size * 2,
                                     hidden_size=hidden_size,
-                                    num_layers=1,
+                                    num_layers=rnn_layer,
                                     bidirectional=True,
                                     rnn_type='lstm')
         # question understanding
         self.qu_reader = DocReader(input_size=(hidden_size * 2) * 2,
                                    hidden_size=hidden_size,
-                                   num_layers=1,
+                                   num_layers=rnn_layer,
                                    bidirectional=True,
                                    rnn_type='lstm')
         # Fusion reader
         fully_fused_dim = (hidden_size * 2) * 5
         self.fused_reader = DocReader(input_size=fully_fused_dim,
                                       hidden_size=hidden_size,
-                                      num_layers=1,
+                                      num_layers=rnn_layer,
                                       bidirectional=True,
                                       rnn_type='lstm')
         # final reader
         self_fused_dim = (hidden_size * 2) * 2
         self.cu_reader = DocReader(input_size=self_fused_dim,
                                            hidden_size=hidden_size,
-                                           num_layers=1,
+                                           num_layers=rnn_layer,
                                            bidirectional=True,
                                            rnn_type='lstm')
         # --- Attention --- #
@@ -257,7 +259,8 @@ class FusionNet(nn.Module):
                                       )
 
         # Dropout layer
-        self.dropout = nn.Dropout(p=0.4)
+        self.dropout_emb = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=dropout)
         
     def forward(self, context, question, appear):
         '''
@@ -273,8 +276,8 @@ class FusionNet(nn.Module):
         c_word = self.embedding(context)
         q_word = self.embedding(question)
         
-        c_word = self.dropout(c_word)
-        q_word = self.dropout(q_word)
+        c_word = self.dropout_emb(c_word)
+        q_word = self.dropout_emb(q_word)
         # word_attn: (batch, c_len, word_dim)
         word_attn = self.word_attention(c_word, q_word)
         ''' 

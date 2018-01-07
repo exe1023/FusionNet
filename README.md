@@ -5,17 +5,16 @@ My implementation of the [FusionNet](https://openreview.net/pdf?id=BJIgi_eCZ) fo
 I think it is easy to modify `preprocess.py` to use this model on SQuAD dataset.
 
 ## HOW TO RUN:
-
-`python3 preprocess.py`
-
-`python3 train.py`
-
+```
+$ python3 preprocess.py
+$ python3 train.py
+```
 ## TODO:
 I will implement following word feature soon
-- Glove word vector and fine-tune (Maybe fasttext?)
+- <strike>Glove word vector and fine-tune (Maybe fasttext?) </strike>
 - CoVe vector
-- POS, NER, normalized term frequency
-- context word appears in the quesiton?
+- POS, NER, normalized term frequency 
+- <strike>context word appears in the quesiton?</strike>
 
 ## References:
 - [FUSION NET: FUSING VIA FULLY-AWARE ATTENTION WITH APPLICATION TO MACHINE COMPREHENSION](https://openreview.net/pdf?id=BJIgi_eCZ)

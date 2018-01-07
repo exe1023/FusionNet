@@ -19,6 +19,8 @@ parser.add_argument('--embedding_size', type=int, default=200, help='the embeddi
 parser.add_argument('--vocab_size', type=int, default=25000, help='the vocab size [25000]')
 # Training hyperparameter
 parser.add_argument('--word_base', action='store_true')
+parser.add_argument('--dropout', type=float, default=0.6)
+parser.add_argument('--rnn_layer', type=int, default=1)
 parser.add_argument('--batch_size', type=int, default=32, help='the size of batch [32]')
 parser.add_argument('--lr', type=float, default=1e-3, help='the learning rate of encoder [1e-3]')
 parser.add_argument('--valid_ratio', type=float, default=0.05)
@@ -56,9 +58,13 @@ if __name__ == '__main__':
         w2v = load_embedding(args.embedding_source, 
                        vocabulary.to_idx,
                        300)
+    else:
+        w2v = None
     fusion_net = FusionNet(vocab_size=len(vocabulary),
                            word_dim=300,
                            hidden_size=125,
+                           rnn_layer=args.rnn_layer,
+                           dropout=args.dropout,
                            pretrained_embedding=w2v)
     if use_cuda:
         fusion_net = fusion_net.cuda()
@@ -80,7 +86,7 @@ if __name__ == '__main__':
             start, end, start_attn, end_attn = fusion_net(context, q, appear)
             loss = criterion(start_attn, start_ans) + criterion(end_attn, end_ans)
             loss.backward()
-            nn.utils.clip_grad_norm(fusion_net.parameters(), 1)
+            nn.utils.clip_grad_norm(fusion_net.parameters(), 10)
             optimizer.step()
 
             start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
