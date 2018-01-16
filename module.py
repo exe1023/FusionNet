@@ -38,7 +38,7 @@ class FullyAttention(nn.Module):
         o_feature *= self.D
         # (batch, out_len, attn_dim) * (batch, con_len, attn_dim) -> (batch, out_len, con_len)
         attn = torch.bmm(o_feature, c_feature.transpose(1, 2))
-        attn = F.softmax(attn.view(-1, con_len)).view(batch, -1, con_len)
+        attn = F.softmax(attn.view(-1, con_len), -1).view(batch, -1, con_len)
         # (batch, out_len, con_len) * (batch, con_len, hidden_dim) -> (batch, out_len, hidden_dim)
         mix = torch.bmm(attn, context)
         return mix
@@ -71,7 +71,7 @@ class WordAttention(nn.Module):
         q_feature = F.relu(self.linear(q))
         # (batch, c_len, dim) * (batch, q_len, dim) -> (batch, c_len, q_len)
         attn = torch.bmm(c_feature, q_feature.transpose(1, 2))
-        attn = F.softmax(attn.view(-1, q_len)).view(batch, -1, q_len)
+        attn = F.softmax(attn.view(-1, q_len), -1).view(batch, -1, q_len)
         # (batch, c_len, q_len) * (batch, q_len, dim) -> (batch, c_len, dim)
         mix = torch.bmm(attn, q)
         return mix
@@ -93,6 +93,7 @@ class DocReader(nn.Module):
                  hidden_size, 
                  num_layers,
                  bidirectional=True,
+                 dropout = 0.6,
                  rnn_type='lstm'):
         super(DocReader, self).__init__()
         self.bidirectional = bidirectional
@@ -103,13 +104,15 @@ class DocReader(nn.Module):
             self.rnn = nn.GRU(input_size, hidden_size,
                               num_layers=num_layers,
                               bidirectional=bidirectional,
-                              batch_first=True)
+                              batch_first=True,
+                              dropout=dropout)
         elif rnn_type =='lstm':
             self.rnn = nn.LSTM(input_size, 
                                hidden_size, 
                                num_layers=num_layers,
                                bidirectional=bidirectional,
-                               batch_first=True)
+                               batch_first=True,
+                               dropout=dropout)
         else:
             print('Unexpected rnn type')
             exit()
@@ -163,7 +166,7 @@ class PointerNet(nn.Module):
         q_flat = question.contiguous().view(-1, q_dim)
         scores = self.fc_q(question.view(-1, q_dim))
         #scores.data.masked_fill_(x_mask.data, -float('inf'))
-        beta = F.softmax(scores).view(batch, q_len)
+        beta = F.softmax(scores, -1).view(batch, q_len)
         u_q = weighted_avg(question, beta)
 
         start_weight = self.fc_start(u_q)
@@ -171,14 +174,14 @@ class PointerNet(nn.Module):
         start_attn = context.bmm(start_weight.unsqueeze(2)).squeeze(2)
         # start_attn.data.masked_fill_(x_mask.data, -float('inf'))
         
-        start = F.softmax(start_attn)
+        start = F.softmax(start_attn, -1)
         
         v_q, _ = self.start2end(weighted_avg(context, start).unsqueeze(1),
                                 u_q.unsqueeze(0))
         end_weight = self.fc_end(v_q.squeeze(1))
         end_attn = context.bmm(end_weight.unsqueeze(2)).squeeze(2)
         
-        end = F.softmax(end_attn)
+        end = F.softmax(end_attn, -1)
 
         return start, end, start_attn, end_attn
 
@@ -205,27 +208,32 @@ class FusionNet(nn.Module):
                                   hidden_size=hidden_size,
                                   num_layers=rnn_layer,
                                   bidirectional=True,
+                                  dropout=dropout,
                                   rnn_type='lstm')
         self.q_high_reader = DocReader(input_size=hidden_size * 2,
                                        hidden_size=hidden_size,
                                        num_layers=rnn_layer,
                                        bidirectional=True,
+                                       dropout=dropout,
                                        rnn_type='lstm')
         self.c_low_reader = DocReader(input_size=c_dim,
                                   hidden_size=hidden_size,
                                   num_layers=rnn_layer,
                                   bidirectional=True,
+                                  dropout=dropout,
                                   rnn_type='lstm')
         self.c_high_reader = DocReader(input_size=hidden_size * 2,
                                     hidden_size=hidden_size,
                                     num_layers=rnn_layer,
                                     bidirectional=True,
+                                    dropout=dropout,
                                     rnn_type='lstm')
         # question understanding
         self.qu_reader = DocReader(input_size=(hidden_size * 2) * 2,
                                    hidden_size=hidden_size,
                                    num_layers=rnn_layer,
                                    bidirectional=True,
+                                   dropout=dropout,
                                    rnn_type='lstm')
         # Fusion reader
         fully_fused_dim = (hidden_size * 2) * 5
@@ -233,6 +241,7 @@ class FusionNet(nn.Module):
                                       hidden_size=hidden_size,
                                       num_layers=rnn_layer,
                                       bidirectional=True,
+                                      dropout=dropout,
                                       rnn_type='lstm')
         # final reader
         self_fused_dim = (hidden_size * 2) * 2
@@ -240,6 +249,7 @@ class FusionNet(nn.Module):
                                            hidden_size=hidden_size,
                                            num_layers=rnn_layer,
                                            bidirectional=True,
+                                           dropout=dropout,
                                            rnn_type='lstm')
         # --- Attention --- #
         self.word_attention = WordAttention(word_dim)
