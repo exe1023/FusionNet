@@ -16,6 +16,9 @@ I will implement following word feature soon
 - POS, NER, normalized term frequency 
 - <strike>context word appears in the quesiton?</strike>
 
+## Result:
+[Kaggle competition](https://www.kaggle.com/c/ml-2017fall-final-chinese-qa/leaderboard)
+
 ## References:
 - [FUSION NET: FUSING VIA FULLY-AWARE ATTENTION WITH APPLICATION TO MACHINE COMPREHENSION](https://openreview.net/pdf?id=BJIgi_eCZ)
 - [Awesome implementation of the DrQA](https://github.com/facebookresearch/DrQA)
