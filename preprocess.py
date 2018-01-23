@@ -4,12 +4,11 @@ import os
 from tqdm import tqdm
 import jieba
 import tokenizers
-dict_path = os.path.join(os.getenv("JIEBA_DATA"), "dict.txt.big") 
+from functools import partial
+from multiprocessing import Pool
+from multiprocessing.util import Finalize
 
-annotators = {'ner','pos'}
-nlp = tokenizers.get_class('corenlp')(annotators=annotators)
-
-def tokenize(text):
+def tokenize_ch(text):
     text = jieba.cut(text.strip(), cut_all=False)
     return list(text)
 
@@ -24,16 +23,16 @@ def preprocess_ch(file_name, output_name, skip_answer=False):
         for paragraph in article['paragraphs']:
             # keys: context, qas
             context = paragraph['context']
-            context_token = tokenize(context)
+            context_token = tokenize_ch(context)
             for qa in paragraph['qas']:
                 qa_id = qa['id']
                 q = qa['question']
-                q_token = tokenize(q)
+                q_token = tokenize_ch(q)
                 if skip_answer:
                     ans_text, ans_text_token, ans_start, ans_end = '', [], -1, -1
                 else:
                     ans_text = qa['answers'][0]['text']
-                    ans_text_token = tokenize(ans_text)
+                    ans_text_token = tokenize_ch(ans_text)
                     ans_start = qa['answers'][0]['answer_start']
                     ans_end = ans_start + len(ans_text)
                 assert context[ans_start:ans_end] == ans_text
@@ -49,6 +48,13 @@ def preprocess_ch(file_name, output_name, skip_answer=False):
                                 'ans_end': ans_end
                 })
     json.dump(examples, open(output_name, 'w'))
+
+TOK = None
+
+def init(tokenizer_class, options):
+    global TOK
+    TOK = tokenizer_class(**options)
+    Finalize(TOK, TOK.shutdown, exitpriority=100)
 
 def load_squad(file_name):
     data = json.load(open(file_name, 'r'))['data']
@@ -74,11 +80,37 @@ def find_answer(offsets, begin_offset, end_offset):
     if len(start) == 1 and len(end) == 1:
         return start[0], end[0]
 
+def tokenize(text):
+    """Call the global process tokenizer on the input text."""
+    global TOK
+    tokens = TOK.tokenize(text)
+    output = {
+        'words': tokens.words(),
+        'offsets': tokens.offsets(),
+        'pos': tokens.pos(),
+        'lemma': tokens.lemmas(),
+        'ner': tokens.entities(),
+    }
+    return output
+
 def preprocess_squad(file_name, output_name, skip_answer=False):
     data = load_squad(file_name)
-    import spacy
-    nlp = spacy.load('en')
+    
+    tokenizer_class = tokenizers.get_class('spacy')
+    make_pool = partial(Pool, 8, initializer=init)
+    workers = make_pool(initargs=(tokenizer_class, {'annotators': {'lemma'}}))
+    q_tokens = workers.map(tokenize, data['questions'])
+    workers.close()
+    workers.join()
 
+    workers = make_pool(
+        initargs=(tokenizer_class, {'annotators': {'lemma', 'pos', 'ner'}})
+    )
+    c_tokens = workers.map(tokenize, data['contexts'])
+    workers.close()
+    workers.join()
+
+    examples = []
     for idx in range(len(data['qids'])):
         question = q_tokens[idx]['words']
         qlemma = q_tokens[idx]['lemma']
@@ -95,7 +127,7 @@ def preprocess_squad(file_name, output_name, skip_answer=False):
                                     ans['answer_start'] + len(ans['text']))
                 if found:
                     ans_tokens.append(found)
-        yield {
+        examples.append( {
             'id': data['qids'][idx],
             'question': question,
             'document': document,
@@ -105,8 +137,11 @@ def preprocess_squad(file_name, output_name, skip_answer=False):
             'lemma': lemma,
             'pos': pos,
             'ner': ner,
-        }
+        })
+    json.dump(examples, open(output_name, 'w'))
 
 if __name__ == '__main__':
-    preprocess_ch('CQA_data/train-v1.1.json', 'train.json')
-    preprocess_ch('CQA_data/test-v1.1.json', 'test.json', True)
+    #preprocess_ch('CQA_data/train-v1.1.json', 'train.json')
+    #preprocess_ch('CQA_data/test-v1.1.json', 'test.json', True)
+    preprocess_squad('squad/train-v1.1.json', 'train_squad.json')
+    preprocess_squad('squad/dev-v1.1.json', 'dev_squad.json')
