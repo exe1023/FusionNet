@@ -1,14 +1,15 @@
 # FusionNet
 
-My implementation of the [FusionNet](https://openreview.net/pdf?id=BJIgi_eCZ) for chinese machine comprehension dataset (not public dataset).
+This is my pytorch implementation of the [FusionNet: Fusing via Fully-aware Attention with Application to Machine Comprehension](https://openreview.net/pdf?id=BJIgi_eCZ) for chinese machine comprehension dataset (not public dataset). However, I am now implementing the preprocessing/decoding for SQuAD, I think the SQuAD compatiable version will be released soon.
 
-I think it is easy to modify `preprocess.py` to use this model on SQuAD dataset.
+Feel free to use/modify it. Any improvement will be appreciated.
 
 ## HOW TO RUN:
 ```
 $ python3 preprocess.py
 $ python3 train.py
 ```
+
 ## TODO:
 I will implement following word feature soon
 - <strike>Glove word vector and fine-tune (Maybe fasttext?) </strike>
