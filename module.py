@@ -14,11 +14,11 @@ class FullyAttention(nn.Module):
     def __init__(self, in_dim, attn_dim):
         super(FullyAttention, self).__init__()
         self.U = nn.Linear(in_dim, attn_dim)
-        
+
         self.D = nn.Parameter(torch.Tensor(attn_dim))
         stdv = 1. / math.sqrt(self.D.size(0))
         self.D.data.uniform_(-stdv, stdv)
-    
+
     def forward(self, h_output, h_context, context):
         '''
         Fusing output to context
@@ -54,7 +54,7 @@ class WordAttention(nn.Module):
         '''
         super(WordAttention, self).__init__()
         self.linear = nn.Linear(dim, dim)
-    
+
     def forward(self, c, q):
         '''
         Args:
@@ -80,7 +80,7 @@ class Embedding(nn.Module):
     def __init__(self, vocab_size, embedding_size):
         super(Embedding, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_size)
-    
+
     def forward(self, input):
         return self.embedding(input)
 
@@ -88,9 +88,9 @@ class Embedding(nn.Module):
         self.embedding.weight.data.copy_(torch.from_numpy(pretrained_embedding))
 
 class DocReader(nn.Module):
-    def __init__(self, 
-                 input_size, 
-                 hidden_size, 
+    def __init__(self,
+                 input_size,
+                 hidden_size,
                  num_layers,
                  bidirectional=True,
                  dropout = 0.6,
@@ -107,8 +107,8 @@ class DocReader(nn.Module):
                               batch_first=True,
                               dropout=dropout)
         elif rnn_type =='lstm':
-            self.rnn = nn.LSTM(input_size, 
-                               hidden_size, 
+            self.rnn = nn.LSTM(input_size,
+                               hidden_size,
                                num_layers=num_layers,
                                bidirectional=bidirectional,
                                batch_first=True,
@@ -116,7 +116,7 @@ class DocReader(nn.Module):
         else:
             print('Unexpected rnn type')
             exit()
-    
+
     def forward(self, input, hidden):
         output, hidden = self.rnn(input, hidden)
         return output, hidden
@@ -142,7 +142,7 @@ def weighted_avg(x, weights):
     return weights.unsqueeze(1).bmm(x).squeeze(1)
 
 class PointerNet(nn.Module):
-    def __init__(self, 
+    def __init__(self,
                  context_size,
                  question_size,
                  hidden_size=250
@@ -152,8 +152,8 @@ class PointerNet(nn.Module):
 
         self.fc_start = nn.Linear(question_size, context_size)
         self.fc_end = nn.Linear(question_size, context_size)
-        
-        self.start2end = nn.GRU(context_size, 
+
+        self.start2end = nn.GRU(context_size,
                                 question_size,
                                 num_layers=1,
                                 bidirectional=False,
@@ -166,21 +166,21 @@ class PointerNet(nn.Module):
         q_flat = question.contiguous().view(-1, q_dim)
         scores = self.fc_q(question.view(-1, q_dim))
         #scores.data.masked_fill_(x_mask.data, -float('inf'))
-        beta = F.softmax(scores, -1).view(batch, q_len)
+        beta = F.softmax(scores.view(batch, q_len), -1)
         u_q = weighted_avg(question, beta)
 
         start_weight = self.fc_start(u_q)
         # (batch, c_len, c_dim) * (batch, c_dim, 1) -> (batch, c_len, 1)
         start_attn = context.bmm(start_weight.unsqueeze(2)).squeeze(2)
         # start_attn.data.masked_fill_(x_mask.data, -float('inf'))
-        
+
         start = F.softmax(start_attn, -1)
-        
+
         v_q, _ = self.start2end(weighted_avg(context, start).unsqueeze(1),
                                 u_q.unsqueeze(0))
         end_weight = self.fc_end(v_q.squeeze(1))
         end_attn = context.bmm(end_weight.unsqueeze(2)).squeeze(2)
-        
+
         end = F.softmax(end_attn, -1)
 
         return start, end, start_attn, end_attn
@@ -199,12 +199,12 @@ class FusionNet(nn.Module):
         self.embedding = Embedding(vocab_size, word_dim)
         if pretrained_embedding is not None:
             self.embedding.init_embedding(pretrained_embedding)
-        
+
         # --- FusionNet RNN reader --- #
         # low(high)-level concepts
         q_dim = word_dim
         c_dim = word_dim + word_dim + 1
-        self.q_low_reader = DocReader(input_size=q_dim, 
+        self.q_low_reader = DocReader(input_size=q_dim,
                                   hidden_size=hidden_size,
                                   num_layers=rnn_layer,
                                   bidirectional=True,
@@ -271,7 +271,7 @@ class FusionNet(nn.Module):
         # Dropout layer
         self.dropout_emb = nn.Dropout(p=0.3)
         self.dropout = nn.Dropout(p=dropout)
-        
+
     def forward(self, context, question, appear):
         '''
         Args:
@@ -285,16 +285,16 @@ class FusionNet(nn.Module):
         # Embed word
         c_word = self.embedding(context)
         q_word = self.embedding(question)
-        
+
         c_word = self.dropout_emb(c_word)
         q_word = self.dropout_emb(q_word)
         # word_attn: (batch, c_len, word_dim)
         word_attn = self.word_attention(c_word, q_word)
-        ''' 
+        '''
         TODO:
         c_feature, q_feature:
             contextualized vector
-        c_feature: 
+        c_feature:
             POS, NER, Normalized term frequency
         '''
         c_feature = torch.cat((c_word, appear.view(batch, c_len, 1), word_attn), 2)
@@ -304,7 +304,7 @@ class FusionNet(nn.Module):
         # q_low: (batch, q_len, hidden_size * 2)
         c_low, _ = self.c_low_reader(c_feature, self.c_low_reader.init_hidden(batch))
         q_low, _ = self.q_low_reader(q_feature, self.q_low_reader.init_hidden(batch))
-        
+
         c_low = self.dropout(c_low)
         q_low = self.dropout(q_low)
 
@@ -316,7 +316,7 @@ class FusionNet(nn.Module):
         # Question Understanding
         qu, _ = self.qu_reader(torch.cat((q_low, q_high), 2),
                             self.qu_reader.init_hidden(batch))
-        
+
         qu = self.dropout(qu)
         # Form history of word
         # TODO: contextualized vector
@@ -329,16 +329,16 @@ class FusionNet(nn.Module):
         # Read fully-fused informaiotn
         fused_v, _ = self.fused_reader(torch.cat((c_low, c_high, low_fusion, high_fusion, understand_fusion), 2),
                                     self.fused_reader.init_hidden(batch))
-        
+
         fused_v = self.dropout(fused_v)
         # self-boosted fusion
         c_history = torch.cat((c_history, low_fusion, high_fusion,
                                 understand_fusion, fused_v), 2)
-        
+
         self_fusion = self.self_fusion(c_history, c_history, fused_v)
         cu, _ = self.cu_reader(torch.cat((fused_v, self_fusion), 2),
                             self.cu_reader.init_hidden(batch))
-        
+
         cu = self.dropout(cu)
         # --- Pointer Network --- #
         start, end, start_attn, end_attn = self.pointer_net(cu, qu)
